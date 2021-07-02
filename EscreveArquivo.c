@@ -17,7 +17,7 @@ void EscreveArquivo(HANDLE hComm)
   enviaComando(comandoSerial, hComm, qtdEventosString, 4);
 
   int qtdEventosMSB = qtdEventosString[1] << 8;
-  int qtdEventosLSB = qtdEventosString[2] << 7;
+  int qtdEventosLSB = qtdEventosString[2];
   int qtdEventos = qtdEventosMSB + qtdEventosLSB;
 
   char *bufferAtivacoes[qtdEventos];
@@ -86,6 +86,14 @@ void EscreveArquivo(HANDLE hComm)
     {
       strncat(row, "Detecção", MAX_ROW_SIZE);
     }
+    else if (dispositivo == 'G')
+    {
+      strncat(row, "Gerente", MAX_ROW_SIZE);
+    }
+    else if (dispositivo == 'V')
+    {
+      strncat(row, "Vigilante", MAX_ROW_SIZE);
+    }
 
     strncat(row, ";", MAX_ROW_SIZE);
 
@@ -99,7 +107,7 @@ void EscreveArquivo(HANDLE hComm)
     // Transform Dia, Mês, Ano
     tmp = "     ";
     int anoMSB = bufferAtivacoes[i][7] << 8;
-    int anoLSB = bufferAtivacoes[i][8] << 7;
+    int anoLSB = bufferAtivacoes[i][8];
     int ano = anoMSB + anoLSB;
 
     sprintf(tmp, "%ul/%ul/%d", (int)dia, (int)mes, ano);

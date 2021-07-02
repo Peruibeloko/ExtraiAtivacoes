@@ -1,7 +1,7 @@
 #include <windows.h>
 #include <stdio.h>
 
-#define EVT_CHAR 0xAD
+#define EVT_CHAR 0xAE
 
 HANDLE abrePortaSerial(int comPort)
 {
@@ -43,7 +43,7 @@ HANDLE abrePortaSerial(int comPort)
   dcb.EvtChar = EVT_CHAR;
 
   SetCommState(hComm, &dcb);
-  SetCommMask(hComm, EV_RXFLAG);
+  SetCommMask(hComm, EV_RXCHAR | EV_TXEMPTY);
 
   printf("Tudo feito, iniciando troca de informações...\n\n");
   return hComm;
