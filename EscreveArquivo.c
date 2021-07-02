@@ -5,12 +5,16 @@
 
 #define BLOCK_START 0xAE
 #define BLOCK_END 0xAF
+#define LOG_FLAG 0x6C
+#define READ_FLAG 0x72
+#define NUMBER_FLAG 0x6E
+
 #define LOG_ENTRY_SIZE 11
 #define MAX_ROW_SIZE 64
 
 void EscreveArquivo(HANDLE hComm)
 {
-  char comandoSerial[4] = {BLOCK_START, 'n', 'l', BLOCK_END};
+  char comandoSerial[4] = {BLOCK_START, NUMBER_FLAG, LOG_FLAG, BLOCK_END};
 
   char *qtdEventosString = malloc(4);
   printf("Solicitando nº de ativações\n\n");
@@ -18,10 +22,12 @@ void EscreveArquivo(HANDLE hComm)
 
   int qtdEventosMSB = qtdEventosString[1] << 8;
   int qtdEventosLSB = qtdEventosString[2];
-  int qtdEventos = qtdEventosMSB + qtdEventosLSB;
+  int qtdEventos = qtdEventosMSB | qtdEventosLSB;
+
+  printf("Dados recebidos: %X %X %X %X \n\n", qtdEventosString[0], qtdEventosString[1], qtdEventosString[2], qtdEventosString[3]);
 
   char *bufferAtivacoes[qtdEventos];
-  comandoSerial[1] = 'r';
+  comandoSerial[1] = READ_FLAG;
 
   for (int i = 0; i < qtdEventos; i++)
   {
@@ -108,7 +114,7 @@ void EscreveArquivo(HANDLE hComm)
     tmp = "     ";
     int anoMSB = bufferAtivacoes[i][7] << 8;
     int anoLSB = bufferAtivacoes[i][8];
-    int ano = anoMSB + anoLSB;
+    int ano = anoMSB | anoLSB;
 
     sprintf(tmp, "%ul/%ul/%d", (int)dia, (int)mes, ano);
 
