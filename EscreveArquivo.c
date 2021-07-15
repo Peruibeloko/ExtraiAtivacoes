@@ -4,12 +4,12 @@
 #include "CommsHandler.h"
 
 #define BLOCK_START 0xAE
-#define BLOCK_END 0xAF
-#define LOG_FLAG 0x6C
 #define READ_FLAG 0x72
 #define NUMBER_FLAG 0x6E
+#define LOG_FLAG 0x6C
+#define BLOCK_END 0xAF
 
-#define LOG_ENTRY_SIZE 11
+#define LOG_ENTRY_SIZE 10
 #define MAX_ROW_SIZE 64
 
 void EscreveArquivo(HANDLE hComm)
@@ -24,7 +24,11 @@ void EscreveArquivo(HANDLE hComm)
   int qtdEventosLSB = qtdEventosString[2];
   int qtdEventos = qtdEventosMSB | qtdEventosLSB;
 
-  printf("Dados recebidos: %X %X %X %X \n\n", qtdEventosString[0], qtdEventosString[1], qtdEventosString[2], qtdEventosString[3]);
+  printf("Dados recebidos: %02X %02X %02X %02X \n\n",
+         qtdEventosString[0],
+         qtdEventosString[1],
+         qtdEventosString[2],
+         qtdEventosString[3]);
 
   char *bufferAtivacoes[qtdEventos];
   comandoSerial[1] = READ_FLAG;
@@ -36,7 +40,22 @@ void EscreveArquivo(HANDLE hComm)
     enviaComando(comandoSerial, hComm, bufferAtivacoes[i], LOG_ENTRY_SIZE);
   }
 
-  printf("\n\nEventos armazenados\n\n");
+  printf("\n\nEventos recebidos: \n\n");
+
+  for (int i = 0; i < qtdEventos; i++)
+  {
+    printf("%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n",
+           bufferAtivacoes[i][0],
+           bufferAtivacoes[i][1],
+           bufferAtivacoes[i][2],
+           bufferAtivacoes[i][3],
+           bufferAtivacoes[i][4],
+           bufferAtivacoes[i][5],
+           bufferAtivacoes[i][6],
+           bufferAtivacoes[i][7],
+           bufferAtivacoes[i][8],
+           bufferAtivacoes[i][9]);
+  }
 
   FILE *ponteiroArquivo, *ponteiroArquivoRaw;
   char *rawFilePath = malloc(128);
@@ -46,9 +65,12 @@ void EscreveArquivo(HANDLE hComm)
   sprintf(rawFilePath, "%s\\Desktop\\LogAtivacoesRaw.dat", userPath);
   sprintf(txtFilePath, "%s\\Desktop\\LogAtivacoes.csv", userPath);
 
-  printf("Gerando dump binário...\n\n");
+  printf("\nGerando dump binário...\n\n");
   ponteiroArquivoRaw = fopen(rawFilePath, "wb");
-  fwrite(bufferAtivacoes, 1, sizeof(bufferAtivacoes), ponteiroArquivoRaw);
+  for (int i = 0; i < qtdEventos; i++)
+  {
+    fputs(bufferAtivacoes[i], ponteiroArquivoRaw);
+  }
   fclose(ponteiroArquivoRaw);
   printf("Caminho do arquivo binário - %s\n\n", rawFilePath);
   free(rawFilePath);
@@ -65,50 +87,51 @@ void EscreveArquivo(HANDLE hComm)
     char dia = bufferAtivacoes[i][5];
     char mes = bufferAtivacoes[i][6];
 
-    memset(row, 0, MAX_ROW_SIZE);
-
     // Transform Evento
-    if (evento == 'B')
+    if (evento == 0x42)
     {
-      strncat(row, "Bloqueio", MAX_ROW_SIZE);
+      strcat(row, "Bloqueio");
     }
-    else if (evento == 'D')
+    else if (evento == 0x44)
     {
-      strncat(row, "Desbloqueio", MAX_ROW_SIZE);
+      strcat(row, "Desbloqueio");
     }
 
-    strncat(row, ";", MAX_ROW_SIZE);
+    strcat(row, ";");
+    printf("%s\r", row);
 
     // Transform Dispositivo
-    if (dispositivo == 'P')
+    if (dispositivo == 0x50)
     {
-      strncat(row, "Painel", MAX_ROW_SIZE);
+      strcat(row, "Painel");
     }
-    else if (dispositivo == 'C')
+    else if (dispositivo == 0x43)
     {
-      strncat(row, "Controle", MAX_ROW_SIZE);
+      strcat(row, "Controle");
     }
-    else if (dispositivo == 'D')
+    else if (dispositivo == 0x44)
     {
-      strncat(row, "Detecção", MAX_ROW_SIZE);
+      strcat(row, "Detecção");
     }
-    else if (dispositivo == 'G')
+    else if (dispositivo == 0x47)
     {
-      strncat(row, "Gerente", MAX_ROW_SIZE);
+      strcat(row, "Gerente");
     }
-    else if (dispositivo == 'V')
+    else if (dispositivo == 0x56)
     {
-      strncat(row, "Vigilante", MAX_ROW_SIZE);
+      strcat(row, "Vigilante");
     }
 
-    strncat(row, ";", MAX_ROW_SIZE);
+    strcat(row, ";");
+    printf("%s\r", row);
 
     // Transform Hora, Minuto
     char *tmp = "     ";
-    sprintf(tmp, "%ulh%ul", (int)hora, (int)minuto);
+    sprintf(tmp, "%dh%d", (int)hora, (int)minuto);
 
-    strncat(row, tmp, MAX_ROW_SIZE);
-    strncat(row, ";", MAX_ROW_SIZE);
+    strcat(row, tmp);
+    strcat(row, ";");
+    printf("%s\r", row);
 
     // Transform Dia, Mês, Ano
     tmp = "     ";
@@ -116,14 +139,15 @@ void EscreveArquivo(HANDLE hComm)
     int anoLSB = bufferAtivacoes[i][8];
     int ano = anoMSB | anoLSB;
 
-    sprintf(tmp, "%ul/%ul/%d", (int)dia, (int)mes, ano);
+    sprintf(tmp, "%d/%d/%d", (int)dia, (int)mes, ano);
 
-    strncat(row, tmp, MAX_ROW_SIZE);
-    strncat(row, "\r\n", MAX_ROW_SIZE);
+    strcat(row, tmp);
+    strcat(row, "\r\n");
+    printf("%s\r\n", row);
 
     fputs(row, ponteiroArquivo);
   }
-  printf("Caminho da planilha - %s\n\n", txtFilePath);
+  printf("\nCaminho da planilha - %s\n\n", txtFilePath);
 
   fclose(ponteiroArquivo);
   fechaPortaSerial(hComm);
