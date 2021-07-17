@@ -16,13 +16,13 @@ void EscreveArquivo(HANDLE hComm)
 {
   char comandoSerial[4] = {BLOCK_START, NUMBER_FLAG, LOG_FLAG, BLOCK_END};
 
-  char *qtdEventosString = malloc(4);
+  unsigned char *qtdEventosString = malloc(4);
   printf("Solicitando nº de ativações\n\n");
   enviaComando(comandoSerial, hComm, qtdEventosString, 4);
 
-  int qtdEventosMSB = qtdEventosString[1] << 8;
-  int qtdEventosLSB = qtdEventosString[2];
-  int qtdEventos = qtdEventosMSB | qtdEventosLSB;
+  int qtdEventosByteAlto = qtdEventosString[1] << 8;
+  int qtdEventosByteBaixo = qtdEventosString[2];
+  int qtdEventos = qtdEventosByteAlto | qtdEventosByteBaixo;
 
   printf("Dados recebidos: %02X %02X %02X %02X \n\n",
          qtdEventosString[0],
@@ -30,7 +30,7 @@ void EscreveArquivo(HANDLE hComm)
          qtdEventosString[2],
          qtdEventosString[3]);
 
-  char *bufferAtivacoes[qtdEventos];
+  unsigned char *bufferAtivacoes[qtdEventos];
   comandoSerial[1] = READ_FLAG;
 
   for (int i = 0; i < qtdEventos; i++)
@@ -40,36 +40,22 @@ void EscreveArquivo(HANDLE hComm)
     enviaComando(comandoSerial, hComm, bufferAtivacoes[i], LOG_ENTRY_SIZE);
   }
 
-  printf("\n\nEventos recebidos: \n\n");
-
-  for (int i = 0; i < qtdEventos; i++)
-  {
-    printf("%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n",
-           bufferAtivacoes[i][0],
-           bufferAtivacoes[i][1],
-           bufferAtivacoes[i][2],
-           bufferAtivacoes[i][3],
-           bufferAtivacoes[i][4],
-           bufferAtivacoes[i][5],
-           bufferAtivacoes[i][6],
-           bufferAtivacoes[i][7],
-           bufferAtivacoes[i][8],
-           bufferAtivacoes[i][9]);
-  }
-
   FILE *ponteiroArquivo, *ponteiroArquivoRaw;
-  char *rawFilePath = malloc(128);
-  char *txtFilePath = malloc(128);
+  char *rawFilePath = calloc(128, 1);
+  char *txtFilePath = calloc(128, 1);
   const char *userPath = getenv("USERPROFILE");
 
   sprintf(rawFilePath, "%s\\Desktop\\LogAtivacoesRaw.dat", userPath);
   sprintf(txtFilePath, "%s\\Desktop\\LogAtivacoes.csv", userPath);
 
   printf("\nGerando dump binário...\n\n");
-  ponteiroArquivoRaw = fopen(rawFilePath, "wb");
+  ponteiroArquivoRaw = fopen(rawFilePath, "w");
   for (int i = 0; i < qtdEventos; i++)
   {
-    fputs(bufferAtivacoes[i], ponteiroArquivoRaw);
+    for (int k = 0; k < LOG_ENTRY_SIZE; k++)
+    {
+      fputc(bufferAtivacoes[i][k], ponteiroArquivoRaw);
+    }
   }
   fclose(ponteiroArquivoRaw);
   printf("Caminho do arquivo binário - %s\n\n", rawFilePath);
@@ -77,9 +63,10 @@ void EscreveArquivo(HANDLE hComm)
 
   printf("Gerando planilha de ativações...\n\n");
   ponteiroArquivo = fopen(txtFilePath, "w");
-  char *row = calloc(1, MAX_ROW_SIZE);
+  char *row;
   for (int i = 0; i < qtdEventos; i++)
   {
+    row = calloc(MAX_ROW_SIZE, 1);
     char evento = bufferAtivacoes[i][1];
     char dispositivo = bufferAtivacoes[i][2];
     char hora = bufferAtivacoes[i][3];
@@ -98,7 +85,6 @@ void EscreveArquivo(HANDLE hComm)
     }
 
     strcat(row, ";");
-    printf("%s\r", row);
 
     // Transform Dispositivo
     if (dispositivo == 0x50)
@@ -111,7 +97,7 @@ void EscreveArquivo(HANDLE hComm)
     }
     else if (dispositivo == 0x44)
     {
-      strcat(row, "Detecção");
+      strcat(row, "Deteccao");
     }
     else if (dispositivo == 0x47)
     {
@@ -123,35 +109,30 @@ void EscreveArquivo(HANDLE hComm)
     }
 
     strcat(row, ";");
-    printf("%s\r", row);
 
     // Transform Hora, Minuto
-    char *tmp = "     ";
-    sprintf(tmp, "%dh%d", (int)hora, (int)minuto);
+    char *tmp = calloc(6, 1);
+    sprintf(tmp, "%02dh%02d;", (int)hora, (int)minuto);
 
     strcat(row, tmp);
-    strcat(row, ";");
-    printf("%s\r", row);
 
     // Transform Dia, Mês, Ano
-    tmp = "     ";
-    int anoMSB = bufferAtivacoes[i][7] << 8;
-    int anoLSB = bufferAtivacoes[i][8];
-    int ano = anoMSB | anoLSB;
+    free(tmp);
+    tmp = calloc(11, 1);
+    int anoByteAlto = bufferAtivacoes[i][7] << 8;
+    int anoByteBaixo = bufferAtivacoes[i][8];
+    int ano = anoByteAlto | anoByteBaixo;
 
-    sprintf(tmp, "%d/%d/%d", (int)dia, (int)mes, ano);
+    sprintf(tmp, "%02d/%02d/%d\n", (int)dia, (int)mes, ano);
 
     strcat(row, tmp);
-    strcat(row, "\r\n");
-    printf("%s\r\n", row);
-
     fputs(row, ponteiroArquivo);
+    free(row);
   }
   printf("\nCaminho da planilha - %s\n\n", txtFilePath);
 
   fclose(ponteiroArquivo);
   fechaPortaSerial(hComm);
-  free(row);
   free(txtFilePath);
   free(bufferAtivacoes);
 
